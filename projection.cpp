@@ -67,7 +67,15 @@ int main(){
     
     //projection(unsigned k, unsigned s, unsigned m, array sequences)
 
-
     
-    std::cout << x << std::endl;
+    String<int> kPositions;
+    srand (1); //set seed
+    for (unsigned i=0; i < k; i++){
+        kPositions +=  rand() % (l-1);
+    }
+
+    for (int i=0; i<length(kPositions); i++){
+        std::cout << kPositions[i] << std::endl;
+    }
+    
 }
