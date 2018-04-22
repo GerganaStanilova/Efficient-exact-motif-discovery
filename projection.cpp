@@ -1,4 +1,6 @@
 #include <iostream>
+#include <algorithm> 
+#include <cstdlib>
 #include <seqan/sequence.h>
 #include <seqan/basic.h>
 #include <seqan/stream.h>
@@ -6,6 +8,8 @@
 #include <seqan/modifier.h>
 #include <seqan/arg_parse.h>
 #include <seqan/index.h>
+
+using namespace std;
 using namespace seqan;
 
 unsigned h(){
@@ -68,13 +72,30 @@ int main(){
     //projection(unsigned k, unsigned s, unsigned m, array sequences)
 
     
-    String<int> kPositions;
-    srand (1); //set seed
-    for (unsigned i=0; i < k; i++){
-        kPositions +=  rand() % (l-1);
+    
+    //first generate all possible positions of the motif
+    String<int> lPositions;
+    for (int i=0; i<l; ++i){
+        lPositions += i;
+    } 
+    
+    
+    srand(1); //set seed
+    //shuffle the array lPositions
+    for (int i=(l-1); i>0; --i){ //--i or i--???????????????????????????????????????????
+        int j = rand()%i;         //chose a random position to swap
+        int temp = lPositions[i]; //temporary variable
+        lPositions[i] = lPositions[j];
+        lPositions[j] = temp;
     }
-
-    for (int i=0; i<length(kPositions); i++){
+    
+    //get the first k elements of lPositions into kPositions
+    String<int> kPositions;
+    for (int i=0; i<k; ++i){
+        kPositions += lPositions[i];
+    } 
+    
+    for (int i=0; i<k; i++){
         std::cout << kPositions[i] << std::endl;
     }
     
