@@ -25,11 +25,11 @@ int main()
 
     //t sequences each of length n
     int t = 20;
-    int n = 30;
+    int n = 600;
     
     //(15,4)
-    int motif_length = 8; //l
-    int d = 2;
+    //int motif_length = 15; //l
+    //int d = 4;
 
     //(14,4)
     //int motif_length = 14; //l
@@ -42,8 +42,10 @@ int main()
     //(18,6)
     //int motif_length = 18; //l
     //int d = 6;
-    //int motif_length = 8; //l
-    //int d = 2;
+    
+    //smaller dataset
+    int motif_length = 11; //l
+    int d = 2;
 
     //for the sake of reproducibility
     std::mt19937 rng;
@@ -64,7 +66,6 @@ int main()
     planted_motif_File.close();
 
     //save the sequences in a file
-   
     ofstream fastaFile;
     ostringstream oss;
     oss << "exampleDataset_" << motif_length << "_" << d << ".fasta";
@@ -82,25 +83,24 @@ int main()
     
     //for each of the t sequences make a permutation of the planted motif
     for (int seqNum = 0; seqNum < t; seqNum++){
+        DnaString planted_motif_in_seq;
+        planted_motif_in_seq = planted_motif;
         //randomly chose the number of positions at which the planted motif will have mutations
         int number_of_mut = mut_num_distr(eng);
-        cout << "number of mutations: " << number_of_mut << endl;
         if(number_of_mut > 0){
             //for each mutation
             for(int i=0; i<number_of_mut; ++i){
                 //randomly chose the positions at which the mutation will occur
                 int mutation_pos = mut_pos_distr(eng);
-                planted_motif[mutation_pos] = Dna(rng() % 4); //the mutation (problem: could replace with the same letter)
+                planted_motif_in_seq[mutation_pos] = Dna(rng() % 4); //the mutation (problem: could replace with the same letter)
             }
         }
-        //cout << "the plant motif after permut " << planted_motif  << endl;
         //randomly chose the positions at which the motif will be in the sequence
         int pos_of_motif = motif_pos_distr(eng);
-        //cout << "pos of motif " << pos_of_motif << endl;
         DnaString sequence;
         for (int j = 0; j <= n; j++){
             if(j == pos_of_motif){
-                sequence += planted_motif;
+                sequence += planted_motif_in_seq;
             } else if(j > pos_of_motif &&(j < (pos_of_motif+length(planted_motif)))){
                 continue;
             } else if (j < pos_of_motif || (j > (pos_of_motif+length(planted_motif)))){
@@ -108,9 +108,7 @@ int main()
             }
         }
         
-        //cout << "sequence with motif: " << sequence << endl; 
-        //instead of appending the sequence to the stringSet we want to
-        //save it in a fasta file 
+        //saving the sequences in a fasta file
         ostringstream oss2;
         oss2 << ">seq" << seqNum << "\n";
         string seq_identifier = oss2.str();
