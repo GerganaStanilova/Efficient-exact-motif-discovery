@@ -1,19 +1,21 @@
+#include <algorithm>
+#include <bits/stdc++.h>
+#include <cmath>
+#include <cstdlib>
 #include <iostream>
+#include <random>
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-#include <algorithm>
-#include <seqan/sequence.h>
-#include <seqan/index.h>
-#include <seqan/stream.h>
-#include<bits/stdc++.h>
 
-//#include <algorithm> 
-//#include <cstdlib>
-//#include <seqan/basic.h>
-//#include <seqan/file.h>
-//#include <seqan/modifier.h>
-//#include <seqan/arg_parse.h>
+#include <seqan/arg_parse.h>
+#include <seqan/basic.h>
+#include <seqan/file.h>
+#include <seqan/index.h>
+#include <seqan/modifier.h>
+#include <seqan/seq_io.h>
+#include <seqan/sequence.h>
+#include <seqan/stream.h>
 
 
 using namespace std;
@@ -27,7 +29,10 @@ pair<DnaString,int> get_best_conseq(vector<pair<DnaString,int>> conseqs) {
         if(conseq.second == 0) 
             return conseq;
         // for the first run, set cur_min_score to first conseq score
-        if(cur_min_score == -1) cur_min_score = conseq.second;
+        if(cur_min_score == -1) {
+            cur_min_score = conseq.second;
+            best_conseq = conseq;
+        } 
 
         // look for the smallest conseq score
         if(conseq.second < cur_min_score) {
@@ -37,6 +42,13 @@ pair<DnaString,int> get_best_conseq(vector<pair<DnaString,int>> conseqs) {
     }
     return best_conseq;
 }
+
+double rwp(double num, int precision) {
+    double d = num;
+    double factor = pow(10.0,(double) precision);
+    double rounded = (int)(d * factor)/factor;
+    return rounded;
+} 
 
 char getOneOrZero(int number) { //int to char function for the bitmap
     if(number == 0) return '0';
@@ -59,18 +71,39 @@ int hammingDist(DnaString str1, DnaString str2) {
 
 int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences){
 
+    bool print_trial_number = true;
+    bool print_bucket_avg_size = true;
+    
+    bool print_bucket_size = false;
+    bool print_bitmap = false;
     bool print_bucket_contents = false;
+    bool print_current_posM = false;
+    bool print_first_posM = false;
+    bool print_refined_posM = false;
+    bool print_initial_Wh = false;
+    bool print_first_refined_Wh = false;
+    bool print_current_lmer_added_to_T = false;
+    bool print_conseqs_in_bucket = false;
+    bool print_current_hamm = false;
+    bool print_final_kmer_conseqs = false;
+    bool print_best_conseq_of_kmer = false;
+    bool print_final_conseqs = false;
+    bool print_best_conseq = false;
 
     int motif_length = l;
-    //we iterate m times; we have m trials
     int seq_amount = length(sequences);
     int seq_length = length(sequences[0]);
     vector<pair<DnaString,int>> final_conseqs;
-    for(int tr = 0; tr < m; tr++){ // tr stands for trials
+    //we iterate m times; we have m trials
+    for(int tr = 1; tr <= m; tr++){ // tr stands for trials
+    if(print_trial_number) cout << "trial number: " << tr << endl;
+                                
+                               
+                               
                                 /*RANDOM PROJECTIONS*/
         //for each l-mer in each of the t sequences 
         //to chose k random positions 
-        //we first generate an array of length l with k ones and l-k zeros
+        //we first generate a string of ints of length l with k ones and l-k zeros
         String<int> bitmapNumbers;
         String<char> bitmap;
 
@@ -81,7 +114,7 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
             bitmapNumbers += 0;
         } 
     
-        srand(1); //set seed
+        //srand(1); //set seed
         //shuffle the string of ints bitmapNumbers
         for (int i=(motif_length-1); i>0; --i){ 
             int j = rand()%i;         //chose a random position to swap
@@ -93,7 +126,17 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
         //we need the map in the form of a string of char
         for (int i=0; i<motif_length; i++){
             append(bitmap, getOneOrZero(bitmapNumbers[i]));
+             
         }
+        
+        if(print_bitmap){
+            cout << "the bitmap is: ";
+            for (int i=0; i<motif_length; i++){
+                cout << bitmap [i];
+             }
+            cout << endl;
+        } 
+        
         //create a map (dictionary) called buckets
         //the key will be the hash value of the hashed k-mer
         //the value will be a vector of pairs
@@ -115,9 +158,9 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
             
             for (int i = 0; i < length(*it) - motif_length + 1; ++i){
                 int hashV = seqan::hash(indexShape(index), begin(*it) + i);
-                if(buckets.count(hashV) > 0) {
+                if(buckets.count(hashV) > 0) { //if it already exist
                     buckets[hashV].push_back(pair<int,int>(seq,i));
-                } else {
+                } else { //if it doesn't
                     vector<pair<int,int>> tmp_vec;
                     tmp_vec.push_back(pair<int,int>(seq,i));
                     buckets.insert( pair<int, vector<pair<int,int>>>(hashV, tmp_vec));
@@ -129,13 +172,39 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
             for(auto elem : buckets) {
                 cout << "buckets[" << elem.first << "] (size: "<< elem.second.size()<< ") => {" << endl;
                 for(auto p : elem.second) {
-                    //cout << "sequence: " << value(sequences,p.first) << endl;
+                    cout << "sequence: " << value(sequences,p.first) << endl;
                     cout << "    " << p.first << "," << p.second << "\n";
-                    //cout << "starting pos of lmer: " << value(sequences,p.first)[p.second] << endl;
+                    cout << "starting pos of lmer: " << value(sequences,p.first)[p.second] << endl;
                 } 
                 cout << "}" << endl << endl;
             }
         }
+        if(print_bucket_size) {
+            for(auto elem : buckets) {
+                cout << "size: "<< elem.second.size()<< endl;
+            }
+        }
+        if(print_bucket_avg_size) {
+            int num_of_buckets = 0;
+            int bucket_avg_size = 0;
+            int size_of_largest_bucket = 0;
+            for(auto elem : buckets) {
+                
+                num_of_buckets++;
+                bucket_avg_size += elem.second.size();
+                int size_of_bucket = elem.second.size();
+                if(size_of_bucket > size_of_largest_bucket){
+                    size_of_largest_bucket = size_of_bucket;
+                }
+
+            }
+            bucket_avg_size =  bucket_avg_size/num_of_buckets;
+            cout << "the avg size of the buckets is: " << bucket_avg_size << endl;
+            cout << "the size of the largest bucket is: " << size_of_largest_bucket << endl;
+        }
+
+
+
 
                             /*MOTIF REFINEMENT*/
 
@@ -145,102 +214,80 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
         //y is the size of a bucket
         //refine each bucket h with y=>s elements with EM algorithm
         for(auto elem : buckets){
-            int y = elem.second.size(); //number of pairs = number of k-mers in the bucket
+            int y = elem.second.size(); //number of pairs = number of elements in the bucket
             if(y >= s){
-            
+                cout << "for this bucket" << endl;
                 float P[4] = {0.25, 0.25, 0.25, 0.25}; //background probability distribution
                 //initialize weight matrix Wh for prob of a base in the motif with 0-s
                 float Wh[4][motif_length]; 
                 std::fill(Wh[0], Wh[0] + 4 * motif_length, 0);
     
-                for(auto p : elem.second) { //for each k-mer
+                for(auto p : elem.second) { //for each element in the bucket
                     int i = p.first; // seqNr
                     int j = p.second; // position of l-mer in sequence
                     //calculate the frequencies of the bases at every position u in the l-mers
-                    //we access the lmer with value(sequences,i)
+                    //ordValue turns a nt into an int
                     for (int u = 0; u < motif_length; u++)
-                        Wh[ordValue(value(sequences,i)[u+j])][u]++;   
+                        Wh[ordValue(sequences[i][u+j])][u]++;   
                 } 
 
+       
                 for (int i = 0; i < 4; i++)
                     for (int j = 0; j < motif_length; j++)
                         Wh[i][j] = Wh[i][j]/y + P[i]; //in percent + Laplace correction
-
-                //cout << "for bucket with hashValue: " << elem.first << endl;
-                /*for (int i = 0; i < 4; i++){
-                    cout << "i is " << i << "\n";
-                    for (int j = 0; j < motif_length; j++){
-                        cout << "j is " << j << endl;
-                        cout << "value in matrix is " << Wh[i][j] << endl;
-                    }     
-                }*/
+               
                 //-------------Wh is ready
 
-	/*Wh[0][0] =  0.1; Wh[0][1] =  0.5; Wh[0][2] =  0.2;
-	Wh[1][0] =  0.3; Wh[1][1] =  0.2; Wh[1][2] =  0.1;
-	Wh[2][0] =  0.3; Wh[2][1] =  0.1; Wh[2][2] =  0.4;
-	Wh[3][0] =  0.3; Wh[3][1] =  0.2; Wh[3][2] =  0.3;*/
-
+                if(print_initial_Wh) {
+                    cout << "\ninitial Wh:\n";
+                    for (int i = 0; i < 4; i++) {
+                        for (int j = 0; j < motif_length; j++) {
+                            cout << "\t" << Wh[i][j];
+                        }
+                        cout << endl;
+                    }
+                }
 
 
                 StringSet<DnaString> T; //multiset of l-mers
-                //use the Wh* matrix on every sequence and save the l-mer with the highest 
-                //likelihood ratio in T 
+                //the score of T is the number of l-mers whose hamming distance to the consensus sequence is larger than d
                 int score_of_T = 0;
 
                 //initialize a position matrix posM which shows the probability that the motif starts at
                 //a certain position in the sequence (using the initial matrix Wh)
                 float posM[seq_amount][seq_length-motif_length+1];
-                /*
-                for (TStringSetIterator it = begin(sequences); it != end(sequences); ++it){
-                    int seq = distance(begin(sequences),it); //seqNr
-                    //Index<DnaString, IndexEsa<> > index(*it);
-                    float denominator = 0; //Nenner
-                    for (int i = 0; i < length(*it) - motif_length + 1; ++i){
-                        float numerator = 1;
-                        for (int u = 0; u < motif_length; u++){
-                            numerator *= Wh[ordValue((*it)[u+i])][u];    
-                        }
-                        
-                        posM[seq][i] = numerator; //Zaehler
-                        denominator += numerator;
-                    }
-                    for(int i = 0; i < length(*it) - motif_length + 1; ++i){
-                        posM[seq][i] = posM[seq][i]/denominator;
-                        cout << posM[seq][i] << "\t";
-                    }
-                    cout << endl;
-                }
-                cout << endl << endl;
-                */
+                std::fill(posM[0], posM[0] + seq_amount * (seq_length-motif_length+1), 0);          
                 
-                //Refine weight matrix Wh until it converges
+                
                 float ref_Wh_tmp[4][motif_length];
                 float ref_Wh[4][motif_length];
                 float sums[motif_length];
-                
-                for(int refine_iter = 0; refine_iter < 100; refine_iter++){
-
+                //Refine weight matrix W and posM until convergence
+                for(int refine_iter = 0; refine_iter < 200; refine_iter++){
+                    if(print_current_posM || (print_first_posM && refine_iter == 0))
+                        cout << "\ncurrent posM:\n";
                     for (TStringSetIterator it = begin(sequences); it != end(sequences); ++it){
                         int seq = distance(begin(sequences),it); //seqNr
                         //Index<DnaString, IndexEsa<> > index(*it);
-                        float denominator = 0; //Nenner
-                        for (int i = 0; i < length(*it) - motif_length + 1; ++i){
+                        float denominator = 0; //denominator
+                        for (int i = 0; i < seq_length - motif_length + 1; ++i){
                             float numerator = 1;
                             for (int u = 0; u < motif_length; u++){
                                 numerator *= Wh[ordValue((*it)[u+i])][u];    
                             }
                             
-                            posM[seq][i] = numerator; //Zaehler
+                            posM[seq][i] = numerator; //numerator
                             denominator += numerator;
                         }
-                        for(int i = 0; i < length(*it) - motif_length + 1; ++i){
+                        for(int i = 0; i < seq_length - motif_length + 1; ++i){
                             posM[seq][i] = posM[seq][i]/denominator;
-                            //cout << posM[seq][i] << "\t";
+                            if(print_current_posM || (print_first_posM && refine_iter == 0)) {
+                                cout << posM[seq][i] << "\t";
+                            } 
                         }
-                        //cout << endl;
+                        if(print_current_posM || (print_first_posM && refine_iter == 0)) cout << endl;
                     }
-                    //cout << endl << endl;
+                    if(print_current_posM || (print_first_posM && refine_iter == 0)) cout << endl << endl;
 
                     // make Wh the current ref_Wh_tmp:                    
                     for(int i = 0; i<4; i++)
@@ -248,7 +295,7 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
                             ref_Wh_tmp[i][j] = Wh[i][j];
                             
                     std::fill(ref_Wh[0], ref_Wh[0] + 4 * motif_length, 0);
-                    std::fill(sums, sums+4, 0);
+                    std::fill(sums, sums+motif_length, 0);
 
                     /*
                     start is the position in the motif whose probability we are researching P’ ordValue(), start
@@ -259,50 +306,75 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
                     for(int start = 0; start < motif_length; start++)
                         for(int i=0; i < seq_amount; i++)
                             for (int j=start, pos=0; (pos < seq_length - motif_length + 1) ; j++, pos++)
-                                ref_Wh_tmp[ordValue(sequences[i][j])][start] += posM[i][pos]; //nominator
+                                ref_Wh_tmp[ordValue(sequences[i][j])][start] += posM[i][pos]; //numerator
 
 
                     for(int i = 0; i<4; i++) //iterating through Wh
                         for(int j = 0; j < motif_length; j++) {
                             //ref_Wh_tmp[i][j] += Wh[i][j];
                             sums[j] += ref_Wh_tmp[i][j]; //for the denominator
-                            ref_Wh[i][j] = ref_Wh_tmp[i][j]; //for better overview
+                            ref_Wh[i][j] = ref_Wh_tmp[i][j]; //for better overview of numerator and denominator
                         }
 
                     for(int i = 0; i<4; i++) {
                         for(int j = 0; j < motif_length; j++) {
                             Wh[i][j] = ref_Wh[i][j] / sums[j];
-                            //cout << "  \t" << Wh[i][j];
+                            if(isnan(Wh[i][j])) {
+                                cout << "\nref_Wh["<<i<<"]["<<j<<"] = "<< ref_Wh[i][j] << " and sums["<<j<<"] is "<< sums[j] <<endl;
+                                abort();
+                            }
+                            if(sums[j] == 0) abort();
                         }
-                        //cout << endl;
                     }    
-                    //cout << endl;  
+                    
+                    if(refine_iter == 0 && print_first_refined_Wh) {
+                        cout << "\nfirst refined Wh:\n";
+                        for(int i = 0; i<4; i++) {
+                            for(int j = 0; j < motif_length; j++) {
+                                cout << "  \t" << Wh[i][j];
+                            }
+                            cout << endl;
+                        }    
+                    }
                 } // End of refinement
-                
-                /*for(int i = 0; i<4; i++) {
-                    for(int j = 0; j < motif_length; j++) {
-                        cout << "  \t" << Wh[i][j];
+
+                if(print_refined_posM) {
+                    cout << "\nfinal posM:"<< seq_length <<"\n";
+                    for(int i = 0; i < seq_amount; i++) {
+                        for(int j = 0; j < seq_length - motif_length + 1; j++) {
+                            cout << "\t" << rwp(posM[i][j],2);
+                        }
+                        cout << endl;
                     }
                     cout << endl;
-                } */   
+                }
 
 
+
+                            /*CONSENSUS SEQUENCE*/
+
+                //create the stringSet T of the l-mers
+                //take an l-mer from each sequence using the posM
                 for(int i = 0; i < seq_amount; i++) {
                     DnaString current_lmer;
+                    int row = 0;
+                    int col = 0;
+                    int local_max = 0;
                     for(int j = 0; j < seq_length - motif_length + 1; j++) {
-                        if(posM[i][j] == 1) {
-                            for(int k = 0; k<motif_length; k++)
-                                current_lmer += sequences[i][j+k];
-                            break;
+                        if(posM[i][j] > local_max) {
+                            local_max = posM[i][j];
+                            row = i;
+                            col = j;
                         }
                     }
+                    for(int k = 0; k<motif_length; k++)
+                        current_lmer += sequences[row][col+k];
                     appendValue(T, current_lmer);
-                    //cout << "current_lmer: " << current_lmer << endl;
-                } // T is filled with this buckets lmers now
+                    if(print_current_lmer_added_to_T) cout << "current_lmer: " << current_lmer << endl;
+                } // here T is filled with this bucket's lmers
 
-
-                DnaString Ct;
-                for(int j=0; j<motif_length;j++) {
+                DnaString Ct; //consensus sequnce
+                for(int j=0; j<motif_length;j++) { ;
                     int scores[4] = {0};
                     int max_score = 0;
                     char character = 'A';
@@ -315,65 +387,120 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
                     }
                     Ct += character;
                 }
-                //cout << "Ct: " << Ct << endl;
 
-                for(auto lmer : T)
-                    if(hammingDist(Ct, lmer) > d) score_of_T++;
+                if(print_conseqs_in_bucket) cout << "\nThis buckets conseq is " << Ct << endl;
+
+                for(auto lmer : T) {
+                    int hamm = hammingDist(Ct, lmer);
+                    if(hamm > d) score_of_T++;
+                    if(print_current_hamm) cout << "\nCurrent hamm between "<<Ct<<" and "<<lmer<< " is " << hamm << endl; 
+                }
 
                 final_kmer_conseqs.push_back(pair<DnaString,int>(Ct,score_of_T));
-                //cout << "score: " << score_of_T << endl;
+                
+                if(print_final_kmer_conseqs) {
+                    cout << "\nFinal kmer conseqs:\n";
+                    for(auto conseq : final_kmer_conseqs) {
+                        cout << "kmer: " << conseq.first << "\t|\tscore: " <<conseq.second<<endl;
+                    }
+                    cout << endl;
+                }
 
                 //Ct is the consensus of T
                 //s(T) is the number of elements of T whose Hamming distance to Ct exceeds d
 
-            } // End of (for each bucket in threshold) (this is where stuff happens)
-        } // End of (for each bucket) (nothing really happens between above and here)
+            } // End of (for each bucket in threshold)
+        } // End of (for each bucket)
         
         pair<DnaString,int> best_conseq_of_kmer = get_best_conseq(final_kmer_conseqs);
+
+        if(print_best_conseq_of_kmer) {
+            cout << "\nbest conseq of kmer:\n";
+            cout << "kmer: " << best_conseq_of_kmer.first << "\t|\tscore: " <<best_conseq_of_kmer.second<<endl;
+        }
         // best_conseq_of_kmer (or an euqally good one) is found and saved
         final_conseqs.push_back(best_conseq_of_kmer);
 
     } // End of trials
-    //choose consensus pattern of best bucket 
+    //choose consensus sequence of best bucket 
     //the best bucket is the one with the smallest s(T)
 
+    if(print_final_conseqs) {
+        cout << "\nFinal conseqs:\n";
+        for(auto conseq : final_conseqs) {
+            cout << "kmer: " << conseq.first << "\t|\tscore: " <<conseq.second<<endl;
+        }
+        cout << endl;
+    }
     
     pair<DnaString,int> best_conseq = get_best_conseq(final_conseqs);
+    if(print_best_conseq) {
+        cout << "\nbest conseq:\n";
+        cout << "kmer: " << best_conseq.first << "\t|\tscore: " <<best_conseq.second<<endl;
+    }
+
     cout << "searched consensus sequence: [" << best_conseq.first << "] with a score of " << best_conseq.second << endl;
 
     return 0;
 }
 
-int main(){
+int main(int argc, char const ** argv){
+    typedef Iterator<StringSet<DnaString> >::Type TStringSetIterator;    
+    StringSet<DnaString> sequences;
 
-    //iterator for the string set
-    typedef Iterator<StringSet<DnaString> >::Type TStringSetIterator;
-    int l = 8;
+   //get the fasta file via the console
+
+    if (argc != 2)
+    {
+        std::cerr << "USAGE: build_fai FILE.fa\n";
+        return 0;
+    }
+
+    FaiIndex faiIndex;
+    if (!build(faiIndex, argv[1]))
+    {
+        std::cerr << "ERROR: Could not build FAI index for file " << argv[1] << ".\n";
+        return 0;
+    }
+
+    CharString faiFilename = argv[1];
+    append(faiFilename, ".fai");
+
+    if (!save(faiIndex, toCString(faiFilename)))
+    {
+        std::cerr << "ERROR: Could not write the index to file!\n";
+        return 0;
+    }
+
+    std::cout << "Index file " << faiFilename << " was successfully created.\n";
+
+    //use the fai file to get the content of the fasta file
+    CharString pathToFile = argv[1];
+
+    if (!open(faiIndex, toCString(pathToFile)))
+        std::cout << "ERROR: Could not load FAI index " << pathToFile << ".fai\n";
+
+    
+    
+    unsigned num_of_seqs = numSeqs(faiIndex);
+    cout << "Num of seqs: " << num_of_seqs << endl;
+    for(unsigned idx = 0; idx < num_of_seqs; idx++){
+        DnaString seq_in_file;
+        readSequence(seq_in_file, faiIndex, idx);
+        appendValue(sequences, seq_in_file); //save each sequence in the stringSet sequences
+    }
+
+    int l = 11;
     int motif_length = l;
     int d = 2; //allowed mutations
-    int k = 5; //the number of positions to be projected
+    int k = 7; //the number of positions to be projected
 
-    //choose a value for s (bucket treshold)
-    int s = 2;
+    //choose a value for s (bucket threshold)
+    int s = 4;
     //calculate the optimal number of trials m
-    int m = 10;
+    int m = 16;
     
-    //create example data
-    //t = 3 sequences of length n = 12, where the mutated motif m' occurs
-    //save them in an a string set called sequences
-    
-    StringSet<DnaString> sequences;
-    DnaString str0 = "ACAGTTGCACA";
-    appendValue(sequences, str0);
-    DnaString str1 = "AGGCAGTGGCA";
-    appendValue(sequences, str1);
-    DnaString str2 = "TCAATTGCATC";
-    appendValue(sequences, str2);
-
     //call the function
     projection(l, k, s, m, d, sequences);
 
-    
-    //std::cout << typeid(a).name()  << std::endl;
-    
 }
