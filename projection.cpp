@@ -377,7 +377,7 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
                 for(int j=0; j<motif_length;j++) { ;
                     int scores[4] = {0};
                     int max_score = 0;
-                    char character = 'A';
+                    char character;
                     for(int i=0; i<length(T); i++) {
                         scores[ordValue(T[i][j])]++;
                         if(max_score < scores[ordValue(T[i][j])]) {
