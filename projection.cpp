@@ -43,22 +43,18 @@ pair<DnaString,int> get_best_conseq(vector<pair<DnaString,int>> conseqs) {
     return best_conseq;
 }
 
-double rwp(double num, int precision) {
-    double d = num;
-    double factor = pow(10.0,(double) precision);
-    double rounded = (int)(d * factor)/factor;
-    return rounded;
+double rwp(double num, int precision) { //round with precision = rwp
+    double factor = pow(10.0,(double) precision+1);
+    return (int)(((num * factor)+5)/10)/(factor/10);
 } 
 
-char getOneOrZero(int number) { //int to char function for the bitmap
-    if(number == 0) return '0';
-    if(number == 1) return '1';
-    return -1;
+char getOneOrZero(int number) { //1 if it's positive (for k), 0 if it's negative (for l-k)
+    return (number > 0) ? '1' : '0';
 }
 
 
 // from https://www.geeksforgeeks.org/hamming-distance-two-strings/
-int hammingDist(DnaString str1, DnaString str2) {
+int hammingDist(DnaString& str1, DnaString& str2) {
     int i = 0, count = 0;
     for(int x = 0; x < length(str1); x++) {
         if (str1[i] != str2[i])
@@ -71,11 +67,11 @@ int hammingDist(DnaString str1, DnaString str2) {
 
 int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences){
 
-    bool print_trial_number = true;
-    bool print_bucket_avg_size = true;
+    bool print_trial_number = false;
+    bool print_bucket_avg_size = false;
     
     bool print_bucket_size = false;
-    bool print_bitmap = false;
+    bool print_bitmap = true;
     bool print_bucket_contents = false;
     bool print_current_posM = false;
     bool print_first_posM = false;
@@ -91,44 +87,34 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
     bool print_best_conseq = false;
 
     int motif_length = l;
-    int seq_amount = length(sequences);
+    int projection_length = k;
+    int threshold = s;
+    int number_of_trials = m;
+    int number_of_mutations = d;
+    int seq_quantity = length(sequences);
     int seq_length = length(sequences[0]);
     vector<pair<DnaString,int>> final_conseqs;
     //we iterate m times; we have m trials
     for(int tr = 1; tr <= m; tr++){ // tr stands for trials
-    if(print_trial_number) cout << "trial number: " << tr << endl;
+        if(print_trial_number) cout << "trial number: " << tr << endl;
                                 
                                
                                
                                 /*RANDOM PROJECTIONS*/
         //for each l-mer in each of the t sequences 
-        //to chose k random positions 
-        //we first generate a string of ints of length l with k ones and l-k zeros
-        String<int> bitmapNumbers;
+        //randomly and uniformly distribute k 1s and l-k 0s
         String<char> bitmap;
 
-        for (int i=0; i<k; ++i){
-            bitmapNumbers += 1;
-        } 
-        for (int i=k; i<motif_length; ++i){
-            bitmapNumbers += 0;
-        } 
-    
-        //srand(1); //set seed
-        //shuffle the string of ints bitmapNumbers
-        for (int i=(motif_length-1); i>0; --i){ 
-            int j = rand()%i;         //chose a random position to swap
-            int temp = bitmapNumbers[i]; //temporary variable
-            bitmapNumbers[i] = bitmapNumbers[j];
-            bitmapNumbers[j] = temp;
-        }
+        random_device rd;
+        mt19937 mt(rd());
+        uniform_real_distribution<double> distribution(0.0,1.0);
 
-        //we need the map in the form of a string of char
-        for (int i=0; i<motif_length; i++){
-            append(bitmap, getOneOrZero(bitmapNumbers[i]));
-             
-        }
-        
+        for (int i=0, j=projection_length, k=projection_length - motif_length; i<motif_length; i++)
+            append(bitmap, (distribution(mt) > 0.5 && j != 0 || k == 0) ? getOneOrZero(j--) : getOneOrZero(k++));
+
+        // Bitmap generated 
+
+        //%debug
         if(print_bitmap){
             cout << "the bitmap is: ";
             for (int i=0; i<motif_length; i++){
@@ -139,7 +125,7 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
         
         //create a map (dictionary) called buckets
         //the key will be the hash value of the hashed k-mer
-        //the value will be a vector of pairs
+        //the value will be a vector of pairs of ints
         //in each pair we save the number of the sequence in the string set sequences 
         //and the position of the l-mer  
         map<int, vector<pair<int,int>>> buckets;
@@ -154,19 +140,22 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
             stringToShape(indexShape(index), bitmap);
 
             //turn the iterator into an int so we can use it to save the sequence number
-            int seq = distance(begin(sequences),it); 
+            int cur_seq = distance(begin(sequences),it); 
             
             for (int i = 0; i < length(*it) - motif_length + 1; ++i){
                 int hashV = seqan::hash(indexShape(index), begin(*it) + i);
                 if(buckets.count(hashV) > 0) { //if it already exist
-                    buckets[hashV].push_back(pair<int,int>(seq,i));
+                    buckets[hashV].push_back(pair<int,int>(cur_seq,i));
                 } else { //if it doesn't
                     vector<pair<int,int>> tmp_vec;
-                    tmp_vec.push_back(pair<int,int>(seq,i));
+                    tmp_vec.push_back(pair<int,int>(cur_seq,i));
                     buckets.insert( pair<int, vector<pair<int,int>>>(hashV, tmp_vec));
                 }
             }
         }
+
+
+        //%debug
         //print the content of buckets (seqNr and positon in seq) and its size
         if(print_bucket_contents) {
             for(auto elem : buckets) {
@@ -179,11 +168,13 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
                 cout << "}" << endl << endl;
             }
         }
+        //%debug
         if(print_bucket_size) {
             for(auto elem : buckets) {
                 cout << "size: "<< elem.second.size()<< endl;
             }
         }
+        //%debug
         if(print_bucket_avg_size) {
             int num_of_buckets = 0;
             int bucket_avg_size = 0;
@@ -238,6 +229,7 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
                
                 //-------------Wh is ready
 
+                //%debug
                 if(print_initial_Wh) {
                     cout << "\ninitial Wh:\n";
                     for (int i = 0; i < 4; i++) {
@@ -255,8 +247,8 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
 
                 //initialize a position matrix posM which shows the probability that the motif starts at
                 //a certain position in the sequence (using the initial matrix Wh)
-                float posM[seq_amount][seq_length-motif_length+1];
-                std::fill(posM[0], posM[0] + seq_amount * (seq_length-motif_length+1), 0);          
+                float posM[seq_quantity][seq_length-motif_length+1];
+                std::fill(posM[0], posM[0] + seq_quantity * (seq_length-motif_length+1), 0);          
                 
                 
                 float ref_Wh_tmp[4][motif_length];
@@ -304,7 +296,7 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
                     j is the position in the sequence
                     */
                     for(int start = 0; start < motif_length; start++)
-                        for(int i=0; i < seq_amount; i++)
+                        for(int i=0; i < seq_quantity; i++)
                             for (int j=start, pos=0; (pos < seq_length - motif_length + 1) ; j++, pos++)
                                 ref_Wh_tmp[ordValue(sequences[i][j])][start] += posM[i][pos]; //numerator
 
@@ -340,7 +332,7 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
 
                 if(print_refined_posM) {
                     cout << "\nfinal posM:"<< seq_length <<"\n";
-                    for(int i = 0; i < seq_amount; i++) {
+                    for(int i = 0; i < seq_quantity; i++) {
                         for(int j = 0; j < seq_length - motif_length + 1; j++) {
                             cout << "\t" << rwp(posM[i][j],2);
                         }
@@ -355,7 +347,7 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
 
                 //create the stringSet T of the l-mers
                 //take an l-mer from each sequence using the posM
-                for(int i = 0; i < seq_amount; i++) {
+                for(int i = 0; i < seq_quantity; i++) {
                     DnaString current_lmer;
                     int row = 0;
                     int col = 0;
@@ -377,7 +369,7 @@ int projection(int l, int k, int s, int m, int d, StringSet<DnaString> sequences
                 for(int j=0; j<motif_length;j++) { ;
                     int scores[4] = {0};
                     int max_score = 0;
-                    char character;
+                    char character; // = 'A'; // Platzhalter
                     for(int i=0; i<length(T); i++) {
                         scores[ordValue(T[i][j])]++;
                         if(max_score < scores[ordValue(T[i][j])]) {
@@ -490,15 +482,15 @@ int main(int argc, char const ** argv){
         appendValue(sequences, seq_in_file); //save each sequence in the stringSet sequences
     }
 
-    int l = 11;
+    int l = 15;
     int motif_length = l;
-    int d = 2; //allowed mutations
+    int d = 4; //allowed mutations
     int k = 7; //the number of positions to be projected
 
     //choose a value for s (bucket threshold)
-    int s = 4;
+    int s = 50;
     //calculate the optimal number of trials m
-    int m = 16;
+    int m = 1;
     
     //call the function
     projection(l, k, s, m, d, sequences);
